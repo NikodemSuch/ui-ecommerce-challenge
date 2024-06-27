@@ -1,3 +1,10 @@
+export type SearchResults = {
+  limit: number;
+  products: Product[];
+  skip: number;
+  total: number;
+}
+
 export type Product = {
   id: number;
   title: string;

@@ -2,46 +2,51 @@ import styles from "@/styles/Home.module.css";
 import Image from "next/image";
 import Pagination from "@/components/Pagination/Pagination";
 import { calculateSkip, getPaginationControls } from "@/helpers";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useDebouncedCallback } from 'use-debounce';
+import { SearchResults } from '@/types';
 
 type HomeProps = {};
 
 export default function Page(props: HomeProps) {
-  const router = useRouter();
-  const [productdata, setProductdata] = useState<any>([]);
+  const [productData, setProductData] = useState<any>([]);
   const [pagination, setPagination] = useState<{
     pageStart: number;
     pageEnd: number;
-  }>(undefined);
-  const [page, setPage] = useState<any>();
+  }>({ pageStart: 0, pageEnd: 0});
   const [total, setTotal] = useState<number>(0);
 
-  React.useEffect(() => {
-    let path;
-    let page: number;
-    if (typeof window !== "undefined") {
-      path = new URLSearchParams(window?.location.search);
-      page = +(path.get("page") ?? 1);
-    } else {
-      page = 1;
-    }
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+  const page = Number(searchParams.get('page')) || 1;
+  const query = searchParams.get('query') || '';
 
-    setPage(page);
-
-    const response = fetch(
-      `https://dummyjson.com/products?limit=10&skip=${calculateSkip(10, page)}`,
+  useEffect(() => {
+    fetch(
+      `https://dummyjson.com/products/search?q=${query}&limit=10&skip=${calculateSkip(10, page)}`,
     )
-      .then((res) => {
-        return res.json();
-      })
-      .then((data) => {
-        const paginationControls = getPaginationControls(10, page, data.total);
-        setTotal(data.total);
+      .then((res) => res.json())
+      .then(({ total, products }: SearchResults) => {
+        const paginationControls = getPaginationControls(10, page, total);
+        setTotal(total);
         setPagination(paginationControls);
-        setProductdata(data.products);
+        setProductData(products);
       });
-  }, [router.asPath]);
+  }, [searchParams]);
+
+  const handleSearchChange = useDebouncedCallback((term: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('page');
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
+  }, 300)
 
   return (
     <>
@@ -51,12 +56,18 @@ export default function Page(props: HomeProps) {
             <h1>Shop Products</h1>
           </div>
           <div className={styles.wrapper_Container}>
-            <pre>🎯🎯🎯 Insert Typeahead here</pre>
+            <input
+              type="text"
+              name="search"
+              placeholder="Search here..."
+              defaultValue={searchParams.get('query')?.toString()}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
           </div>
           <div style={{ margin: "5rem 0" }} className={styles.productList}>
-            {productdata &&
-              productdata.length > 0 &&
-              productdata.map((data: any) => (
+            {productData &&
+              productData.length > 0 &&
+              productData.map((data: any) => (
                 <a
                   href={`/products/${data.id}`}
                   className={styles.CardComponent}
